@@ -1,0 +1,18 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+bin
+
+# Ignore logs
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
