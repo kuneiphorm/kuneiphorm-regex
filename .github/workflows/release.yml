@@ -1,0 +1,14 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    uses: kuneiphorm/.github/.github/workflows/release.yml@v0.1.0
