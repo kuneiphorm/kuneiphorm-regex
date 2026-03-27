@@ -25,6 +25,7 @@ import org.kuneiphorm.runtime.exception.UnexpectedEndOfInputException;
  *   <li>Alternation: {@code a|b}
  *   <li>Concatenation: {@code ab} (juxtaposition)
  *   <li>Quantifiers: {@code ?}, {@code +}, {@code *}
+ *   <li>Repetition bounds: {@code {n}}, {@code {n,}}, {@code {n,m}}
  *   <li>Groups: {@code (...)}
  *   <li>Character classes: {@code [a-z]}, {@code [^...]} (negation), trailing dash
  *   <li>Dot: {@code .} (any character except {@code \n})
@@ -149,7 +150,7 @@ public class RegexParser {
   }
 
   // ---------------------------------------------------------------------------
-  // Grammar: F => B ('+'|'?'|'*')?
+  // Grammar: F => B ('+'|'?'|'*'|'{' ... '}')?
   // ---------------------------------------------------------------------------
 
   private Expression<IntRange> readFactor(CharFlow flow) throws IOException, SyntaxException {
@@ -164,8 +165,96 @@ public class RegexParser {
     if (flow.accept('*')) {
       return Expression.star(base);
     }
+    if (flow.accept('{')) {
+      return readRepetition(flow, base);
+    }
 
     return base;
+  }
+
+  /**
+   * Reads a repetition quantifier: {@code {n}}, {@code {n,}}, or {@code {n,m}}.
+   *
+   * <p>Desugars into sequences and optionals:
+   *
+   * <ul>
+   *   <li>{@code {n}} → {@code base} repeated n times
+   *   <li>{@code {n,}} → {@code base} repeated n times + {@code base*}
+   *   <li>{@code {n,m}} → {@code base} repeated n times + {@code base?} repeated (m-n) times
+   * </ul>
+   */
+  private Expression<IntRange> readRepetition(CharFlow flow, Expression<IntRange> base)
+      throws IOException, SyntaxException {
+    int min = readInt(flow);
+
+    if (flow.accept('}')) {
+      // {n} -- exactly n
+      return repeat(base, min);
+    }
+
+    flow.expect(',');
+
+    if (flow.accept('}')) {
+      // {n,} -- n or more
+      List<Expression<IntRange>> parts = new ArrayList<>();
+      for (int i = 0; i < min; i++) {
+        parts.add(base);
+      }
+      parts.add(Expression.star(base));
+      return Expression.sequence(parts);
+    }
+
+    // {n,m} -- between n and m
+    int max = readInt(flow);
+    flow.expect('}');
+
+    if (max < min) {
+      throw new IllegalArgumentException(
+          "Invalid repetition: max (" + max + ") < min (" + min + ")");
+    }
+
+    List<Expression<IntRange>> parts = new ArrayList<>();
+    for (int i = 0; i < min; i++) {
+      parts.add(base);
+    }
+    for (int i = 0; i < max - min; i++) {
+      parts.add(Expression.optional(base));
+    }
+    return Expression.sequence(parts);
+  }
+
+  private int readInt(CharFlow flow) throws IOException, SyntaxException {
+    if (!flow.hasMore() || !isDigit(flow.peek())) {
+      throw new UnexpectedCharException(
+          flow.getName(),
+          flow.getLine(),
+          flow.getColumn(),
+          '0',
+          flow.hasMore() ? (char) flow.peek() : '?');
+    }
+    int result = 0;
+    while (flow.hasMore() && isDigit(flow.peek())) {
+      result = result * 10 + (flow.next() - '0');
+    }
+    return result;
+  }
+
+  private static boolean isDigit(int ch) {
+    return ch >= '0' && ch <= '9';
+  }
+
+  private Expression<IntRange> repeat(Expression<IntRange> base, int count) {
+    if (count == 0) {
+      return Expression.sequence();
+    }
+    if (count == 1) {
+      return base;
+    }
+    List<Expression<IntRange>> parts = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      parts.add(base);
+    }
+    return Expression.sequence(parts);
   }
 
   // ---------------------------------------------------------------------------

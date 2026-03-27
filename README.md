@@ -23,9 +23,9 @@ org.kuneiphorm.regex
 
 | Class | Description |
 |---|---|
-| `RegexParser` | `parse(CharFlow)` is the primary API; `parse(String)` is a convenience wrapper. Produces `Expression<IntRange>` trees. Supports alternation, concatenation, quantifiers, groups, character classes (with negation), dot, shorthand escapes (`\d`, `\w`, `\s` and inverses), POSIX classes (`[[:alpha:]]`), and escape sequences (`\n`, `\t`, `\r`, `\xHH`, `\uHHHH`). |
-| `RegexTokenizerSpec<L>` | Record wrapping a `FragmentedAutomaton<L>`. The compiled output of the builder -- a pure data description consumed by runtime interpreters or code generators. |
-| `RegexTokenizerSpecBuilder<L>` | Collects `(label, regex)` pairs, then builds: parse -> Thompson NFA -> `RangeDeterminizer` -> `Trimmer` -> `Minimizer` -> `AlphabetFragmenter`. First rule added wins on priority conflict. |
+| `RegexParser` | `parse(CharFlow)` is the primary API; `parse(String)` is a convenience wrapper. Produces `Expression<IntRange>` trees. Supports alternation, concatenation, quantifiers (including `{n}`, `{n,}`, `{n,m}`), groups, character classes (with negation), dot, shorthand escapes (`\d`, `\w`, `\s` and inverses), POSIX classes (`[[:alpha:]]`), and escape sequences (`\n`, `\t`, `\r`, `\xHH`, `\uHHHH`). `defineClass(name, ranges)` overrides POSIX classes. |
+| `RegexTokenizerSpec<L>` | Record wrapping a `FragmentedAutomaton<L>` and a `Set<L> labels` of all recognized token labels. The compiled output of the builder -- a pure data description consumed by runtime interpreters or code generators. |
+| `RegexTokenizerSpecBuilder<L>` | Collects `(label, regex)` pairs via `add`, customizes POSIX classes via `defineClass`, then builds: parse -> Thompson NFA -> `RangeDeterminizer` -> `Trimmer` -> `Minimizer` -> `AlphabetFragmenter`. First rule added wins on priority conflict. |
 | `UnknownPosixClassException` | Extends `SyntaxException`. Thrown for unrecognized POSIX class names in `[[:name:]]`. |
 
 ## Supported regex syntax
@@ -35,6 +35,7 @@ org.kuneiphorm.regex
 | `a\|b` | Alternation |
 | `ab` | Concatenation (juxtaposition) |
 | `?`, `+`, `*` | Quantifiers (optional, one-or-more, zero-or-more) |
+| `{n}`, `{n,}`, `{n,m}` | Repetition bounds (exact, at-least, range) |
 | `(...)` | Grouping |
 | `[a-z]`, `[^...]` | Character classes, with negation |
 | `.` | Any character except `\n` |

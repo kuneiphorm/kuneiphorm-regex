@@ -8,6 +8,7 @@ import org.kuneiphorm.daedalus.automaton.State;
 import org.kuneiphorm.daedalus.automaton.Transition;
 import org.kuneiphorm.daedalus.range.Classifier;
 import org.kuneiphorm.daedalus.range.FragmentedAutomaton;
+import org.kuneiphorm.daedalus.range.IntRange;
 import org.kuneiphorm.runtime.exception.SyntaxException;
 
 class RegexTokenizerSpecBuilderTest {
@@ -80,6 +81,46 @@ class RegexTokenizerSpecBuilderTest {
     assertEquals("OPT", simulate(spec, ""));
     assertEquals("OPT", simulate(spec, "a"));
     assertEquals("OPT", simulate(spec, "aaa"));
+  }
+
+  @Test
+  void build_repetitionBounds_acceptsCorrectLength() throws SyntaxException {
+    RegexTokenizerSpec<String> spec =
+        new RegexTokenizerSpecBuilder<String>().add("HEX4", "[0-9a-f]{4}").build();
+    assertEquals("HEX4", simulate(spec, "dead"));
+    assertEquals("HEX4", simulate(spec, "0000"));
+    assertNull(simulate(spec, "abc")); // too short
+    assertNull(simulate(spec, "abcde")); // too long (only 4 matched)
+  }
+
+  @Test
+  void build_repetitionRange_acceptsVariableLength() throws SyntaxException {
+    RegexTokenizerSpec<String> spec =
+        new RegexTokenizerSpecBuilder<String>().add("DIGITS", "[0-9]{2,4}").build();
+    assertNull(simulate(spec, "1")); // too short
+    assertEquals("DIGITS", simulate(spec, "12"));
+    assertEquals("DIGITS", simulate(spec, "123"));
+    assertEquals("DIGITS", simulate(spec, "1234"));
+  }
+
+  @Test
+  void build_labels_containsAllRules() throws SyntaxException {
+    RegexTokenizerSpec<String> spec =
+        new RegexTokenizerSpecBuilder<String>()
+            .add("DIGIT", "[0-9]+")
+            .add("LETTER", "[a-z]+")
+            .build();
+    assertEquals(java.util.Set.of("DIGIT", "LETTER"), spec.labels());
+  }
+
+  @Test
+  void build_defineClass_affectsRegex() throws SyntaxException {
+    RegexTokenizerSpecBuilder<String> builder = new RegexTokenizerSpecBuilder<>();
+    builder.defineClass("alpha", java.util.List.of(new IntRange('x', 'z')));
+    builder.add("ALPHA", "[[:alpha:]]+");
+    RegexTokenizerSpec<String> spec = builder.build();
+    assertEquals("ALPHA", simulate(spec, "xyz"));
+    assertNull(simulate(spec, "abc")); // not in custom alpha
   }
 
   @Test

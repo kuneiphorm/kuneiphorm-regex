@@ -529,6 +529,131 @@ class RegexParserTest {
     assertThrows(SyntaxException.class, () -> parser.parse("[[:alpha:a"));
   }
 
+  // --- Repetition bounds ---
+
+  @Test
+  void parse_exactRepetition_returnsSequence() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("a{3}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(3, expr.getChildren().size());
+  }
+
+  @Test
+  void parse_exactRepetitionOne_returnsUnit() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("a{1}");
+    // {1} is identity — returns the base directly
+    assertInstanceOf(ExpressionUnit.class, expr);
+  }
+
+  @Test
+  void parse_multiDigitRepetition_parsesCorrectly() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("a{12}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(12, expr.getChildren().size());
+  }
+
+  @Test
+  void parse_repetitionWithZeroDigit_works() throws SyntaxException {
+    // Ensures '0' is recognized as a digit (boundary test for isDigit)
+    Expression<IntRange> expr = parser.parse("a{0,1}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(1, expr.getChildren().size());
+    assertInstanceOf(ExpressionQuantifier.class, expr.getChildren().get(0));
+  }
+
+  @Test
+  void parse_repetitionLeadingZero_parsesCorrectly() throws SyntaxException {
+    // {03} should parse as 3 (leading zero in multi-digit)
+    Expression<IntRange> expr = parser.parse("a{03}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(3, expr.getChildren().size());
+  }
+
+  @Test
+  void parse_repetitionNineDigit_boundaryCheck() throws SyntaxException {
+    // Ensures '9' at boundary is recognized as digit
+    Expression<IntRange> expr = parser.parse("a{9}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(9, expr.getChildren().size());
+  }
+
+  @Test
+  void parse_exactRepetitionZero_returnsEmptySequence() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("a{0}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertTrue(expr.getChildren().isEmpty());
+  }
+
+  @Test
+  void parse_minRepetition_returnsSequenceWithStar() throws SyntaxException {
+    // a{2,} → sequence(a, a, a*)
+    Expression<IntRange> expr = parser.parse("a{2,}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(3, expr.getChildren().size());
+    assertInstanceOf(ExpressionQuantifier.class, expr.getChildren().get(2));
+    assertEquals(
+        ExpressionQuantifier.Kind.STAR,
+        ((ExpressionQuantifier<IntRange>) expr.getChildren().get(2)).kind());
+  }
+
+  @Test
+  void parse_minZeroRepetition_returnsStar() throws SyntaxException {
+    // a{0,} → sequence(a*) → just a*
+    Expression<IntRange> expr = parser.parse("a{0,}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(1, expr.getChildren().size());
+    assertInstanceOf(ExpressionQuantifier.class, expr.getChildren().get(0));
+  }
+
+  @Test
+  void parse_rangeRepetition_returnsSequenceWithOptionals() throws SyntaxException {
+    // a{2,4} → sequence(a, a, a?, a?)
+    Expression<IntRange> expr = parser.parse("a{2,4}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(4, expr.getChildren().size());
+    assertInstanceOf(ExpressionUnit.class, expr.getChildren().get(0));
+    assertInstanceOf(ExpressionUnit.class, expr.getChildren().get(1));
+    assertInstanceOf(ExpressionQuantifier.class, expr.getChildren().get(2));
+    assertEquals(
+        ExpressionQuantifier.Kind.OPTIONAL,
+        ((ExpressionQuantifier<IntRange>) expr.getChildren().get(2)).kind());
+  }
+
+  @Test
+  void parse_rangeRepetitionSameMinMax_returnsExact() throws SyntaxException {
+    // a{3,3} → sequence(a, a, a)
+    Expression<IntRange> expr = parser.parse("a{3,3}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(3, expr.getChildren().size());
+    for (Expression<IntRange> child : expr.getChildren()) {
+      assertInstanceOf(ExpressionUnit.class, child);
+    }
+  }
+
+  @Test
+  void parse_rangeRepetitionMaxLessThanMin_throws() {
+    assertThrows(IllegalArgumentException.class, () -> parser.parse("a{3,1}"));
+  }
+
+  @Test
+  void parse_repetitionMissingDigit_throws() {
+    assertThrows(SyntaxException.class, () -> parser.parse("a{,}"));
+  }
+
+  @Test
+  void parse_repetitionOnGroup_works() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("(ab){2}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(2, expr.getChildren().size());
+  }
+
+  @Test
+  void parse_repetitionOnCharClass_works() throws SyntaxException {
+    Expression<IntRange> expr = parser.parse("[0-9]{4}");
+    assertInstanceOf(ExpressionSequence.class, expr);
+    assertEquals(4, expr.getChildren().size());
+  }
+
   // --- defineClass ---
 
   @Test

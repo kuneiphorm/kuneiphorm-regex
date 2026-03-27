@@ -1,10 +1,13 @@
 package org.kuneiphorm.regex;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.kuneiphorm.daedalus.automaton.Automaton;
 import org.kuneiphorm.daedalus.automaton.State;
 import org.kuneiphorm.daedalus.automaton.Transition;
@@ -21,9 +24,10 @@ import org.kuneiphorm.runtime.exception.SyntaxException;
 /**
  * Builds a {@link RegexTokenizerSpec} from named regex rules.
  *
- * <p>RegexPatterns are collected via {@link #add(Object, String)} or {@link #add(Object,
- * Expression)}, then the full compilation pipeline runs when {@link #build()} is called. The first
- * rule added has the highest priority (lower index = higher priority), matching {@link
+ * <p>Rules are collected via {@link #add(Object, String)} or {@link #add(Object, Expression)},
+ * POSIX classes can be customized via {@link #defineClass(String, List)}, then the full compilation
+ * pipeline runs when {@link #build()} is called. The first rule added has the highest priority
+ * (lower index = higher priority), matching {@link
  * org.kuneiphorm.daedalus.craft.RangeDeterminizer}'s priority-based output resolution.
  *
  * <p>The build pipeline is: Thompson NFA -> {@link RangeDeterminizer} -> {@link Trimmer} -> {@link
@@ -44,6 +48,18 @@ public class RegexTokenizerSpecBuilder<L> {
   public RegexTokenizerSpecBuilder() {
     rules = new ArrayList<>();
     parser = new RegexParser();
+  }
+
+  /**
+   * Registers or overrides a POSIX character class used when parsing regex strings.
+   *
+   * @param name the POSIX class name (e.g. {@code "alpha"})
+   * @param ranges the ranges that define the class
+   * @return this builder, for chaining
+   */
+  public RegexTokenizerSpecBuilder<L> defineClass(String name, List<IntRange> ranges) {
+    parser.defineClass(name, ranges);
+    return this;
   }
 
   /**
@@ -121,6 +137,11 @@ public class RegexTokenizerSpecBuilder<L> {
     Automaton<L, IntRange> trimmed = Trimmer.trim(dfa);
     Automaton<L, IntRange> minimized = Minimizer.minimize(trimmed);
     FragmentedAutomaton<L> fragmented = AlphabetFragmenter.fragment(minimized);
-    return new RegexTokenizerSpec<>(fragmented);
+
+    Set<L> labels = new LinkedHashSet<>();
+    for (RegexPattern<L> rule : rules) {
+      labels.add(rule.label());
+    }
+    return new RegexTokenizerSpec<>(fragmented, Collections.unmodifiableSet(labels));
   }
 }
