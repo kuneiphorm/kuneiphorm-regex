@@ -19,6 +19,6 @@ repositories {
 }
 
 dependencies {
-    api("org.kuneiphorm:kuneiphorm-daedalus:0.1.0-rc.1")
+    api("org.kuneiphorm:kuneiphorm-daedalus:0.1.0-rc.2")
     api("org.kuneiphorm:kuneiphorm-runtime:0.1.0-rc.1")
 }
